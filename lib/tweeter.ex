@@ -9,7 +9,7 @@ defmodule Tweeter do
           state = elem(serv_resp,1)
         }
         else{
-          state = {"username" => username, "password" => passwd, "tweets" => [], "follwers"=>[],"follwing"=>[] }
+          state = {"username" => username, "password" => passwd, "tweets" => [], "followers"=>[],"following"=>[] }
         }
     end 
 
@@ -18,16 +18,31 @@ defmodule Tweeter do
 
     end
 
+    def follow_someone(tweeter,someone) do
+        pid = Process.whereis(String.to_atom(someone))
+        if(pid != nil && Process.alive?(pid) == true) do
+            GenServer.call(String.to_atom(someone), {:follow_someone_alive, {tweeter}}) #add tweeter(user) to the followers list of person he follows
+            GenServer.call(String.to_atom(tweeter), {:follow_someone, {someone}}) #add the person whom user follows to users following list
+        else
+            GenServer.call(String.to_atom("mainserver"), {:follow_someone_dead, {tweeter}}) #add tweeter(user) to the followers list of person he follows
+            GenServer.call(String.to_atom(tweeter), {:follow_someone, {someone}}) #add the person whom user follows to users following list
+        end
+        
+        
+        #GenServer.call(String.to_atom(someone), {:tweet, {tweet}})
+
+    end
+
+
     def tweet(tweeter,tweet) do
-
-
-        parse_tweet
+        GenServer.call(String.to_atom(tweeter), {:tweet, {tweet}})
+        parse_tweet(tweeter,tweet)
     end
 
     def go_offline(username) do 
         #state = GenServer.call(String.to_atom("mainserver"),{:get_state,"mainserver"})
         user_state =  GenServer.call(String.to_atom(username),{:get_state,"user"})
-        GenServer.call(String.to_atom("mainserver"), {:go_offline, {user_state}})
+        GenServer.call(String.to_atom("mainserver"), {:go_offline, {username,user_state}})
     end
 
     def parse_tweet(tweeter,tweet) do
@@ -62,10 +77,42 @@ defmodule Tweeter do
 # call backs
   
   
-
   def handle_call({:get_state ,new_message},_from,state) do  
     {:reply,state,state}
   end
+
+  def handle_call({:follow_someone ,new_message},_from,state) do  
+    someone = elem(new_message,0)
+    following_list = Map.get(state,"following")
+    following_list = following_list ++ [someone]
+    {:reply,state,state}
+  end
+
+   def handle_call({:follow_someone_alive ,new_message},_from,state) do  
+    follower = elem(new_message,0)
+    follower_list = Map.get(state,"followers")
+    follower_list = follower_list ++ [follower]
+    {:reply,state,state}
+  end
+
+   def handle_call({:follow_someone_dead ,new_message},_from,state) do  
+     follower = elem(new_message,0)
+     all_users_map = Map.get(state,"users")
+     cur_someone_data = Map.get(all_users_map,follower)
+     cur_someone_follower_list = Map.get(cur_someone_data,"followers")
+     
+    {:reply,state,state}
+  end
+
+
+  def handle_call({:tweet, new_message},_from,state) do
+    tweet = elem(new_message,0)
+    tweets_list = Map.get(state,"tweets")
+    tweets_list = tweets_list ++ [tweet]
+    state = Map.put(state,"tweets",tweets_list)
+    {:reply,state,state}
+  end
+
 
   def handle_call({:go_offline ,new_message},_from,state) do  
     isername = elem(new_message,0)
@@ -77,22 +124,25 @@ defmodule Tweeter do
   def handle_call({:add_new_hashtag, msg},_from,state) do
        hashtag = elem(msg,0)
        tweet =  elem(msg,1)
-       hashtag_map = Map.get(state,"hashtag")
+       hashtag_map = Map.get(state,"hashtags")
        hashtag_map =  Map.put(hashtag_map,hashtag,[tweet])
-       state = Map.put(state,"hashtag",hashtag_map)
+       state = Map.put(state,"hashtags",hashtag_map)
   end
 
   def handle_call({:add_hashtag, msg},_from,state) do
        hashtag = elem(msg,0)
        tweet =  elem(msg,1)
-       hashtag_map = Map.get(state,"hashtag")
+       hashtag_map = Map.get(state,"hashtags")
        hashtag_list = Map.get(hashtag_map,hashtag)
        hashtag_list = hashtag_list ++ [tweet]
        hashtag_map = Map.put(hashtag_map,hashtag,hashtag_list)
-       state = Map.put(state,"hashtag",hashtag_map)
+       state = Map.put(state,"hashtags",hashtag_map)
   end
 
   def handle_call({:add_mention, msg},_from,state) do
+  end
+
+  def handle_call({:add_new_mention, msg},_from,state) do
   end
 
 end
