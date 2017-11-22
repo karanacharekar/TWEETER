@@ -18,6 +18,10 @@ defmodule Tweeter do
 
     end
 
+    def retweet(tweeter,someone,id) do
+        GenServer.call(String.to_atom(tweeter), {:retweet, {someone,id}}) #add the retweeted tweet to tweeter's tweet list
+    end
+
     def follow_someone(tweeter,someone) do
         pid = Process.whereis(String.to_atom(someone))
         if(pid != nil && Process.alive?(pid) == true) do
@@ -81,6 +85,18 @@ defmodule Tweeter do
     {:reply,state,state}
   end
 
+
+  def handle_call({:retweet ,new_message},_from,state) do  
+    someone = elem(new_message,0)
+    tweet_id = elem(new_message,1)
+    someone_state = GenServer.call(String.to_atom(someone),{:get_state, "someone"})
+    someone_tweet_list = Map.get(someone_state,"tweets")
+    (retweet_tweet,id) = Enum.at(someone_tweet_list,tweet_id)
+    tweeter = Map.get(state,"username")
+    tweet(tweeter,retweet_tweet)  
+    {:reply,state,state}
+  end
+
   def handle_call({:follow_someone ,new_message},_from,state) do  
     someone = elem(new_message,0)
     following_list = Map.get(state,"following")
@@ -93,22 +109,27 @@ defmodule Tweeter do
     follower_list = Map.get(state,"followers")
     follower_list = follower_list ++ [follower]
     {:reply,state,state}
-  end
+   end
 
+   
    def handle_call({:follow_someone_dead ,new_message},_from,state) do  
      follower = elem(new_message,0)
      all_users_map = Map.get(state,"users")
      cur_someone_data = Map.get(all_users_map,follower)
      cur_someone_follower_list = Map.get(cur_someone_data,"followers")
-     
-    {:reply,state,state}
+     cur_someone_follower_list = cur_someone_follower_list ++ [follower]
+     cur_someone_data = Map.put(cur_someone_data,"followers",cur_someone_follower_list)
+     all_users_map = Map.put(all_users_map,follower,cur_someone_data)
+     state = Map.put(state,"users",all_users_map)
+     {:reply,state,state}
   end
 
 
   def handle_call({:tweet, new_message},_from,state) do
     tweet = elem(new_message,0)
     tweets_list = Map.get(state,"tweets")
-    tweets_list = tweets_list ++ [tweet]
+    {last_tweet_id,_} = List.last(tweets_list)
+    tweets_list = tweets_list ++ [{last_tweet_id+1,tweet}]
     state = Map.put(state,"tweets",tweets_list)
     {:reply,state,state}
   end
