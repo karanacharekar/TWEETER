@@ -1,27 +1,32 @@
 defmodule Tweeter do
   
+    
+    
+    
     def init(args) do
         username = elem(args,0)
         passwd = elem(args,0)
         state = GenServer.call(String.to_atom(mainserver),{:get_state, "mainserver"})         
-        serv_resp = Map.fetch(state, String.to_atom(username)
+        serv_resp = Map.fetch(state, String.to_atom(username))
         if(elem(serv_resp,0)== String.to_atom("ok")){
           state = elem(serv_resp,1)
         }
         else{
-          state = {"username" => username, "password" => passwd, "tweets" => [], "followers"=>[],"following"=>[] }
+          state = {"username" => username, "password" => passwd, "tweets" => [], "dashboard" => [], "followers"=>[],"following"=>[] }
         }
     end 
 
 
-    def go_online() do
-
+    def go_online(tweeter) do
+        GenServer.call(String.to_atom(tweeter), {:create_dashboard_list, {}})
     end
 
+    
     def retweet(tweeter,someone,id) do
         GenServer.call(String.to_atom(tweeter), {:retweet, {someone,id}}) #add the retweeted tweet to tweeter's tweet list
     end
 
+    
     def follow_someone(tweeter,someone) do
         pid = Process.whereis(String.to_atom(someone))
         if(pid != nil && Process.alive?(pid) == true) do
@@ -30,11 +35,8 @@ defmodule Tweeter do
         else
             GenServer.call(String.to_atom("mainserver"), {:follow_someone_dead, {tweeter}}) #add tweeter(user) to the followers list of person he follows
             GenServer.call(String.to_atom(tweeter), {:follow_someone, {someone}}) #add the person whom user follows to users following list
-        end
-        
-        
+    end
         #GenServer.call(String.to_atom(someone), {:tweet, {tweet}})
-
     end
 
 
@@ -57,10 +59,10 @@ defmodule Tweeter do
             if(String.first(word)=="#"){
                 hashtag_map = Map.get(state,"hashtag")
                 if(Map.fetch(hashtag_map,word,"none") == "none"){
-                    GenServer.call(String.to_atom("mainserver"), {:add_new_hashtag, {word,tweet}})
+                    GenServer.call(String.to_atom("mainserver"), {:add_new_hashtag, {word,tweet,tweeter}})
                 }
                 else{
-                    GenServer.call(String.to_atom("mainserver"), {:add_hashtag, {word,tweet}})
+                    GenServer.call(String.to_atom("mainserver"), {:add_hashtag, {word,tweet,tweeter}})
                 }
             }
 
@@ -68,13 +70,12 @@ defmodule Tweeter do
                 mention_map = Map.get(state,"mentions")
                 if(Map.fetch(mention_map,word,"none")=="none"){
                   mention_map = Map.put(mention_map,word,[tweet])
-                  GenServer.call(String.to_atom("mainserver"), {:add_new_mention, {word,tweet}
+                  GenServer.call(String.to_atom("mainserver"), {:add_new_mention, {word,tweet,tweeter}})
                 }
                 else{
-                  GenServer.call(String.to_atom("mainserver"), {:add_mention, {word,tweet}
+                  GenServer.call(String.to_atom("mainserver"), {:add_mention, {word,tweet,tweeter}})
                 }
             }
-
     end
 
 
@@ -82,6 +83,16 @@ defmodule Tweeter do
   
   
   def handle_call({:get_state ,new_message},_from,state) do  
+    {:reply,state,state}
+  end
+
+
+  def handle_call({:create_dashboard_list,new_message},_from,state) do  
+    tweeter_following_list = Map.get(state,"following")
+    tweeter_dashboard_list = Map.get(state,"dashboard")
+    Enum.each(tweeter_following_list, fn(n) -> 
+
+    end)    
     {:reply,state,state}
   end
 
@@ -129,7 +140,7 @@ defmodule Tweeter do
     tweet = elem(new_message,0)
     tweets_list = Map.get(state,"tweets")
     {last_tweet_id,_} = List.last(tweets_list)
-    tweets_list = tweets_list ++ [{last_tweet_id+1,tweet}]
+    tweets_list = tweets_list ++ [{last_tweet_id+1,os.system_time(:millisecond),tweet}]
     state = Map.put(state,"tweets",tweets_list)
     {:reply,state,state}
   end
@@ -145,25 +156,41 @@ defmodule Tweeter do
   def handle_call({:add_new_hashtag, msg},_from,state) do
        hashtag = elem(msg,0)
        tweet =  elem(msg,1)
+       tweeter = elem(msg,2)
        hashtag_map = Map.get(state,"hashtags")
-       hashtag_map =  Map.put(hashtag_map,hashtag,[tweet])
+       hashtag_map =  Map.put(hashtag_map,hashtag,[{tweeter,tweet}])
        state = Map.put(state,"hashtags",hashtag_map)
   end
 
   def handle_call({:add_hashtag, msg},_from,state) do
        hashtag = elem(msg,0)
        tweet =  elem(msg,1)
+       tweeter = elem(msg,2)
        hashtag_map = Map.get(state,"hashtags")
        hashtag_list = Map.get(hashtag_map,hashtag)
-       hashtag_list = hashtag_list ++ [tweet]
+       hashtag_list = hashtag_list ++ [{tweeter,tweet}]
        hashtag_map = Map.put(hashtag_map,hashtag,hashtag_list)
        state = Map.put(state,"hashtags",hashtag_map)
   end
 
   def handle_call({:add_mention, msg},_from,state) do
+       mention = elem(msg,0)
+       tweet =  elem(msg,1)
+       tweeter = elem(msg,2)
+       mention_map = Map.get(state,"mentions")
+       menion_list = Map.get(mention_map,hashtag)
+       mention_list = mention_list ++ [{tweeter,tweet}]
+       mention_map = Map.put(mention_map,mention,mention_list)
+       state = Map.put(state,"mentions",hashtag_map)
   end
 
   def handle_call({:add_new_mention, msg},_from,state) do
+       mention = elem(msg,0)
+       tweet =  elem(msg,1)
+       tweeter = elem(msg,2)
+       mention_map = Map.get(state,"mentions")
+       mention_map =  Map.put(mention_map,mention,[{tweeter,tweet}])
+       state = Map.put(state,"mentions",hashtag_map)
   end
 
 end
