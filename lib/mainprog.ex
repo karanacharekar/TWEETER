@@ -1,22 +1,56 @@
 defmodule Mainprog do
    use GenServer
     
-    def main(username,password) do
-        register_user(username,password);
+    def main() do
+        testfunc();
     end
 
 
     def register_user(username,password) do
-        GenServer.start_link(__MODULE__, {username,password,{}}, name: String.to_atom(username)) 
-        GenServer.start_link(__MODULE__, {"keyur","keyur",{}}, name: String.to_atom("keyur")) 
+        server_state = GenServer.call(String.to_atom("mainserver"),{:get_state, "mainserver"})
+        allusers_map = Map.get(server_state,"users")
+        if(Map.get(allusers_map,username) == nil) do
+            GenServer.call(String.to_atom("mainserver"),{:register_user, {username,password}}) 
+            IO.puts "user registered"
+        else
+            IO.puts "Username already exists"
+        end
+        
+        #GenServer.start_link(__MODULE__, {"keyur","keyur",{}}, name: String.to_atom("keyur")) 
+
+    
+    end
+
+    def login(user_name,pass_word) do
+        server_state = GenServer.call(String.to_atom("mainserver"),{:get_state, "mainserver"})
+        allusers_map = Map.get(server_state,"users")
+        curr_usr_map = Map.get(allusers_map,user_name)
+        if(curr_usr_map == nil) do
+            IO.puts "User not registered"
+        else
+            if(Map.get(curr_usr_map,"password")==pass_word) do
+                GenServer.start_link(__MODULE__, {user_name,pass_word,{}}, name: String.to_atom(user_name))
+                #GenServer.call(String.to_atom(user_name), {:create_dashboard_list, {}}) ### CHECK THISSS
+                IO.puts "login succesful"
+            else
+                IO.puts "Incorrect password"
+            end
+        end
+    end
+
+    def testfunc() do
+        register_user("karan","karan");
+        register_user("keyur","keyur");
+        login("karan","karan")
+        login("keyur","keyur");
         follow_someone("karan","keyur")
         follow_someone("keyur","karan")
         GenServer.call(String.to_atom("karan"), {:print_state, {}})
         GenServer.call(String.to_atom("keyur"), {:print_state, {}})
-        tweet("keyur", "Hi #karan")
+        tweet("keyur", "Hi @karan")
         IO.puts "back"
         tweet("keyur", "Hi apurv")
-        tweet("keyur", "Hi @abhi")
+        tweet("keyur", "Hi abhi")
         tweet("karan", "I am bored")
         tweet("karan", "Elixir rocks")
         GenServer.call(String.to_atom("keyur"), {:print_state, {}})
@@ -28,8 +62,7 @@ defmodule Mainprog do
         go_offline("keyur")
         IO.puts "-------------------"
         GenServer.call(String.to_atom("mainserver"), {:print_state, {}})
-
-    end
+end
 
     def init(args) do
         username = elem(args,0)
@@ -48,8 +81,7 @@ defmodule Mainprog do
 
 
     def go_online(tweeter) do
-        
-        GenServer.call(String.to_atom(tweeter), {:create_dashboard_list, {}})
+        GenServer.call(String.to_atom(tweeter), {:create_dashboard_list, {}}) ### CHECK THISSS
     end
 
     
@@ -86,6 +118,22 @@ defmodule Mainprog do
         user_state =  GenServer.call(String.to_atom(username),{:get_state,"user"})
         IO.inspect user_state
         GenServer.call(String.to_atom("mainserver"), {:go_offline, {username,user_state}})
+        IO.puts "done"
+        #GenServer.call(String.to_atom(username), {:kill_user, {}}) 
+        
+        pid = Process.whereis(String.to_atom(username))
+        #Process.exit(pid,:kill)
+        
+        IO.inspect pid
+        GenServer.stop(pid,:normal) 
+        #Process.exit(pid,:normal) 
+        pid = Process.whereis(String.to_atom(username))
+        IO.inspect pid
+        if(pid == nil) do
+            IO.puts username <> " killed"
+        else
+            IO.puts username <> " still alive"
+        end 
     end
 
     def parse_tweet(tweeter,tweet,id,timestamp) do
@@ -107,10 +155,13 @@ defmodule Mainprog do
             end
 
             if(String.first(word)=="@") do
+                
                 mention_map = Map.get(state,"mentions")
-                #IO.puts "mention"
+                IO.inspect mention_map
+                IO.puts "mention"
                 if(Map.get(mention_map,word)==nil) do
                   #mention_map = Map.put(mention_map,word,[tweet])
+                  IO.puts "mention inside"
                   GenServer.call(String.to_atom("mainserver"), {:add_new_mention, {word,tweet,tweeter,id,timestamp}})
                 else 
                   GenServer.call(String.to_atom("mainserver"), {:add_mention, {word,tweet,tweeter,id,timestamp}})
@@ -132,6 +183,7 @@ defmodule Mainprog do
     {:reply,state,state}
   end
 
+ 
 
   def handle_call({:create_dashboard_list,new_message},_from,state) do  
     tweeter_following_list = Map.get(state,"following")

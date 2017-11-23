@@ -17,6 +17,18 @@ defmodule Server do
          {:reply,state,state}
     end
 
+   
+
+    def handle_call({:register_user ,new_message},_from,state) do 
+         username = elem(new_message,0)
+         password = elem(new_message,1)
+         all_users_state =  Map.get(state,"users")
+         ins_state = %{"username" => username, "password" => password, "tweets" => [], "dashboard" => [], "followers"=>[],"following"=>[] }
+         all_users_state = Map.put(all_users_state,username,ins_state)
+         state = Map.put(state, "users", all_users_state)
+         {:reply,state,state}
+    end
+
     def handle_call({:print_state ,new_message},_from,state) do 
         IO.inspect state 
         {:reply,state,state}
@@ -75,13 +87,21 @@ defmodule Server do
   def handle_call({:add_new_mention, msg},_from,state) do
        IO.puts "new mention"
        mention = elem(msg,0)
-       tweet =  elem(msg,1)
-       tweeter = elem(msg,2)
-       id = elem(msg,3)
-       timestamp = elem(msg,4)
-       mention_map = Map.get(state,"mentions")
-       mention_map =  Map.put(mention_map,mention,[{id,timestamp,tweeter,tweet}])
-       state = Map.put(state,"mentions",mention_map)
+       allusers_map = Map.get(state,"users")
+       IO.inspect allusers_map
+       mentionwithoutatrate = String.replace(mention, "@", "")
+       IO.inspect mentionwithoutatrate
+       IO.inspect Map.get(allusers_map,mentionwithoutatrate)
+       if(Map.get(allusers_map,mentionwithoutatrate) != nil) do
+            IO.puts "user present"
+            tweet =  elem(msg,1)
+            tweeter = elem(msg,2)
+            id = elem(msg,3)
+            timestamp = elem(msg,4)
+            mention_map = Map.get(state,"mentions")
+            mention_map =  Map.put(mention_map,mention,[{id,timestamp,tweeter,tweet}])
+            state = Map.put(state,"mentions",mention_map)
+        end
        {:reply,state,state}
   end
 
