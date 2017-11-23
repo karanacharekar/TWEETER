@@ -30,8 +30,8 @@ defmodule Mainprog do
         else
             if(Map.get(curr_usr_map,"password")==pass_word) do
                 GenServer.start_link(__MODULE__, {user_name,pass_word,{}}, name: String.to_atom(user_name))
-                #GenServer.call(String.to_atom(user_name), {:create_dashboard_list, {}}) ### CHECK THISSS
-                IO.puts "login succesful"
+                GenServer.call(String.to_atom(user_name), {:create_dashboard_list, {}}) ### CHECK THISSS
+                IO.puts "Login succesful"
             else
                 IO.puts "Incorrect password"
             end
@@ -62,20 +62,17 @@ defmodule Mainprog do
         go_offline("keyur")
         IO.puts "-------------------"
         GenServer.call(String.to_atom("mainserver"), {:print_state, {}})
-end
+    end
 
     def init(args) do
         username = elem(args,0)
         passwd = elem(args,1)
         state = GenServer.call(String.to_atom("mainserver"),{:get_state, "mainserver"})       
-        IO.inspect(state)  
-        serv_resp = Map.get(state, String.to_atom(username))
-        IO.inspect(serv_resp)
-        if(serv_resp == nil) do
-          state = %{"username" => username, "password" => passwd, "tweets" => [], "dashboard" => [], "followers"=>[],"following"=>[] }
-        else
-          state = serv_resp
-        end
+        all_users_map = Map.get(state,"users")  
+        IO.inspect all_users_map
+        IO.inspect username
+        serv_resp = Map.get(all_users_map, username)
+        state = serv_resp
         {:ok,state}
     end 
 
@@ -188,14 +185,19 @@ end
   def handle_call({:create_dashboard_list,new_message},_from,state) do  
     tweeter_following_list = Map.get(state,"following")
     tweeter_dashboard_list = Map.get(state,"dashboard")
-    server_state = GenServer.call(String.to_atom("mainserver"),{:get_state, "mainserver"}) 
-    menion_map = Map.get(server_state,"mentions")
-    tweeter_dashboard_list = tweeter_dashboard_list + Map.get(state,"tweets")
-    Enum.each(tweeter_following_list, fn(n) -> 
-            following_state = GenServer.call(String.to_atom(n),{:get_state, "get following peoples tweets"})  
-            tweeter_dashboard_list = tweeter_dashboard_list + Map.get(following_state,"tweets")
-    end)
-    tweeter_dashboard_list = tweeter_dashboard_list +  Map.get(menion_map,"@"<>Map.get(state,"username"))
+    tweeter_follower_list = Map.get(state,"followers")
+    if(Enum.empty?(tweeter_following_list) && Enum.empty?(tweeter_follower_list) && Enum.empty?(tweeter_dashboard_list)) do
+        IO.puts " First time login "
+    else
+        server_state = GenServer.call(String.to_atom("mainserver"),{:get_state, "mainserver"}) 
+        menion_map = Map.get(server_state,"mentions")
+        tweeter_dashboard_list = tweeter_dashboard_list + Map.get(state,"tweets")
+        Enum.each(tweeter_following_list, fn(n) -> 
+                following_state = GenServer.call(String.to_atom(n),{:get_state, "get following peoples tweets"})  
+                tweeter_dashboard_list = tweeter_dashboard_list + Map.get(following_state,"tweets")
+        end)
+        tweeter_dashboard_list = tweeter_dashboard_list +  Map.get(menion_map,"@"<>Map.get(state,"username"))
+    end
     {:reply,state,state}
   end
 
@@ -274,7 +276,7 @@ end
   end
 
   def handle_call({:tweet_someone_alive, new_message},_from,state) do
-        IO.puts "tweet someone alive"
+       IO.puts "tweet someone alive"
        follower_dashboard_list = Map.get(state,"dashboard") 
        tweet =  elem(new_message,3)
        tweeter = elem(new_message,2)
@@ -283,12 +285,5 @@ end
        follower_dashboard_list = follower_dashboard_list ++ [{id,timestamp,tweeter,tweet}]
        state = Map.put(state,"dashboard",follower_dashboard_list)
        {:reply,state,state}
-  end
-
-
-
-  
-
- 
-   
+  end 
 end 
