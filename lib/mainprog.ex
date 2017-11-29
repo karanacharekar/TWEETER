@@ -10,6 +10,7 @@ defmodule Mainprog do
         Node.connect(String.to_atom(server_name)) 
         IO.inspect Node.list
         testfunc();
+        #IO.puts "####################################"
     end
 
     def get_ip_addr do 
@@ -73,6 +74,7 @@ defmodule Mainprog do
     def testfunc() do
 
         weighted_followers = Test.getZipfDist(1000) |> IO.inspect
+        hashtaglist = ['#karan','#srishti','#aru','#football','#apple','#mango','#realmadrid','#india','#tweeter','#beer','#rum','#vodka']
 
         for x <- 1..1000 do
            register_user("user"<> Integer.to_string(x), "pass"<> Integer.to_string(x)) 
@@ -86,10 +88,15 @@ defmodule Mainprog do
         end
         
         
- 
+        
+
         all_users_list = Test.create_users_list(1000,[])
         num = 1..1000
         num_list = Enum.to_list(num)
+
+        random_tweets_with_hashtag(hashtaglist,100,num_list)
+        random_tweets_with_mention(100,num_list)
+
 
         for x <- 1..3 do
             spawn fn -> Test.simulate_connect_disconnect(num_list) end
@@ -97,14 +104,16 @@ defmodule Mainprog do
 
         for x <- 1..1000 do
             weight = round(Enum.at(weighted_followers,x-1))
-            Test.random_follow("user"<>Integer.to_string(x),weight,num_list)      
+            spawn fn -> Test.random_follow_tweet("user"<>Integer.to_string(x),weight,num_list) end     
         end
+
 
 
         for x <-1..1000 do
             if(Process.whereis(String.to_atom("user"<>to_string(x))) != nil) do
                 retweeter_state = GenServer.call(String.to_atom("user"<>to_string(x)), {:get_state, {}})
             
+
             dashboard_list = Map.get(retweeter_state,"dashboard")
             size = Enum.count(dashboard_list)
             num_retweets = round(:math.ceil(0.30*size))
@@ -117,12 +126,13 @@ defmodule Mainprog do
                     dashboard_list = List.delete(dashboard_list, retweet)
                     if("user"<>to_string(x) != tweeter) do
                         if(Process.whereis(String.to_atom("user"<>to_string(x))) != nil) do
-                            retweet("user"<>to_string(x),tweeter,id)
+                            retweet("user"<>to_string(x),tweeter,id) 
                         end
                     end
                 end
             end
             end
+
         end
 
 
@@ -385,7 +395,7 @@ defmodule Mainprog do
     state = Map.put(state, "dashboard", dashboard_list)
     Enum.each(follower_list, fn(n) ->
         pid = Process.whereis(String.to_atom(n))
-        if(pid != nil && Process.alive?(pid) == true) do
+        if(pid != nil) do
             GenServer.call(String.to_atom(n), {:tweet_someone_alive, {last_tweet_id+1,timestamp,tweeter,tweet}})
         end
     end)
@@ -457,7 +467,33 @@ defmodule Test do
             end
         end
 
-        def random_follow(cur_user,num,num_list) do
+        def random_tweets_with_hashtag(hashtaglist,num,num_list) do
+            cur = Enum.random(num_list)
+            cur_user = "user" <> to_string(cur)
+            if(Process.whereis(String.to_atom(cur_user)) != nil) do
+                    Mainprog.tweet(cur_user,"I am tweet with hashtag " <> Enum.random(hashtaglist))
+            end
+            random_tweets_with_hashtag(hashtaglist,num-1,num_list)
+        end
+
+
+        def random_tweets_with_mention(num,num_list) do
+            cur = Enum.random(num_list)
+            cur_user = "user" <> to_string(cur)
+            mention = Enum.random(num_list)
+            mention_user = "@user"<>mention
+            if(curr != mention) do
+                if(Process.whereis(String.to_atom(cur_user)) != nil) do
+                        Mainprog.tweet(cur_user,"I am tweet with mention " <> "@user" <> Enum.random(num_list))
+                end    
+                random_tweets_with_mention(num-1,num_list)
+            else
+                random_tweets_with_mention(num,num_list)
+            end
+
+        end
+
+        def random_follow_tweet(cur_user,num,num_list) do
             #IO.puts "curr user is " <> to_string(cur_user)
             if num > 0 do
                 to_follow = Enum.random(num_list)
@@ -467,16 +503,18 @@ defmodule Test do
                             num_list = List.delete(num_list,to_follow)
                             #IO.inspect num_list
                             Mainprog.follow_someone("user"<> Integer.to_string(to_follow),cur_user)
-                            if(Process.whereis(String.to_atom(cur_user)) != nil) do
+                    end
+                    if(Process.whereis(String.to_atom(cur_user)) != nil) do
                                 IO.puts "alive"
                                 Mainprog.tweet(cur_user,"I am Tweet")
-                            end
-                            #IO.puts "hereee"
-                            random_follow(cur_user,num-1,num_list)
+
                     end
+                            #IO.puts "hereee"
+                            random_follow_tweet(cur_user,num-1,num_list)
+                    
                 else
                     num_list = List.delete(num_list,to_follow)
-                    random_follow(cur_user,num,num_list)
+                    random_follow_tweet(cur_user,num,num_list)
                 end
             
             end
@@ -484,11 +522,6 @@ defmodule Test do
                 GenServer.call(String.to_atom(cur_user),{:print_state, "someone"}) 
             end
         end
-
-
-
-
-
 
 
 
