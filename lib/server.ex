@@ -125,10 +125,10 @@ defmodule Server do
        IO.puts "new mention"
        mention = elem(msg,0)
        allusers_map = Map.get(state,"users")
-       IO.inspect allusers_map
+       #IO.inspect allusers_map
        mentionwithoutatrate = String.replace(mention, "@", "")
-       IO.inspect mentionwithoutatrate
-       IO.inspect Map.get(allusers_map,mentionwithoutatrate)
+       #IO.inspect mentionwithoutatrate
+       #IO.inspect Map.get(allusers_map,mentionwithoutatrate)
        if(Map.get(allusers_map,mentionwithoutatrate) != nil) do
             IO.puts "user present"
             tweet =  elem(msg,1)

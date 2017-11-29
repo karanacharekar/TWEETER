@@ -74,7 +74,7 @@ defmodule Mainprog do
     def testfunc() do
 
         weighted_followers = Test.getZipfDist(1000) |> IO.inspect
-        hashtaglist = ['#karan','#srishti','#aru','#football','#apple','#mango','#realmadrid','#india','#tweeter','#beer','#rum','#vodka']
+        hashtaglist = ["#karan","#srishti","#aru","#football","#apple","#mango","#realmadrid","#india","#tweeter","#beer","#rum","#vodka"]
 
         for x <- 1..1000 do
            register_user("user"<> Integer.to_string(x), "pass"<> Integer.to_string(x)) 
@@ -104,7 +104,7 @@ defmodule Mainprog do
 
         for x <- 1..1000 do
             weight = round(Enum.at(weighted_followers,x-1))
-            Test.random_follow_tweet("user"<>Integer.to_string(x),weight,num_list)
+            Test.random_follow_tweet("user"<>Integer.to_string(x),weight,num_list) 
         end
 
 
@@ -135,7 +135,7 @@ defmodule Mainprog do
 
         end
 
-
+        GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:print_state, "mainserver"}) 
 
     end
 
@@ -483,29 +483,32 @@ defmodule Test do
         end
 
         def random_tweets_with_hashtag(hashtaglist,num,num_list) do
-            cur = Enum.random(num_list)
-            cur_user = "user" <> to_string(cur)
-            if(Process.whereis(String.to_atom(cur_user)) != nil) do
-                    Mainprog.tweet(cur_user,"I am tweet with hashtag " <> Enum.random(hashtaglist))
+            if num >0 do
+                cur = Enum.random(num_list)
+                cur_user = "user" <> to_string(cur)
+                if(Process.whereis(String.to_atom(cur_user)) != nil) do
+                        Mainprog.tweet(cur_user,"I am tweet with hashtag " <> Enum.random(hashtaglist))
+                end
+                random_tweets_with_hashtag(hashtaglist,num-1,num_list)
             end
-            random_tweets_with_hashtag(hashtaglist,num-1,num_list)
         end
 
 
         def random_tweets_with_mention(num,num_list) do
-            cur = Enum.random(num_list)
-            cur_user = "user" <> to_string(cur)
-            mention = Enum.random(num_list)
-            mention_user = "@user"<>mention
-            if(curr != mention) do
-                if(Process.whereis(String.to_atom(cur_user)) != nil) do
-                        Mainprog.tweet(cur_user,"I am tweet with mention " <> "@user" <> Enum.random(num_list))
-                end    
-                random_tweets_with_mention(num-1,num_list)
-            else
-                random_tweets_with_mention(num,num_list)
+            if num > 0 do
+                cur = Enum.random(num_list)
+                cur_user = "user" <> to_string(cur)
+                mention = Enum.random(num_list)
+                mention_user = "@user"<> to_string(mention)
+                if(cur != mention) do
+                    if(Process.whereis(String.to_atom(cur_user)) != nil) do
+                            Mainprog.tweet(cur_user,"I am tweet with mention " <> "@user" <> to_string(Enum.random(num_list)))
+                    end    
+                    random_tweets_with_mention(num-1,num_list)
+                else
+                    random_tweets_with_mention(num,num_list)
+                end
             end
-
         end
 
         def random_follow_tweet(cur_user,num,num_list) do
