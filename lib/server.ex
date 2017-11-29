@@ -3,10 +3,28 @@ defmodule Server do
     
     def main() do   
         IO.puts "Server reached"
+        server_name = "server@" <> get_ip_addr()
+        Node.start(String.to_atom(server_name))
+        Node.set_cookie :"choco"
         GenServer.start_link(Server, {}, name: String.to_atom("mainserver"))   
         IO.puts "Server created"
         IO.gets ""
     end
+
+
+    def get_ip_addr do 
+        {:ok,lst} = :inet.getif()
+        z = elem(List.last(lst),0) 
+        if elem(z,0)==127 do
+        x = elem(List.first(lst),0)
+        addr =  to_string(elem(x,0)) <> "." <>  to_string(elem(x,1)) <> "." <>  to_string(elem(x,2)) <> "." <>  to_string(elem(x,3))
+        else
+        x = elem(List.last(lst),0)
+        addr =  to_string(elem(x,0)) <> "." <>  to_string(elem(x,1)) <> "." <>  to_string(elem(x,2)) <> "." <>  to_string(elem(x,3))
+        end
+        addr  
+    end
+
 
     def init(state) do
         state = %{"users" => %{}, "hashtags" => %{}, "mentions" => %{}}
@@ -17,7 +35,18 @@ defmodule Server do
          {:reply,state,state}
     end
 
-   
+    def handle_call({:follow_someone_dead ,new_message},_from,state) do  
+     follower = elem(new_message,0)
+     all_users_map = Map.get(state,"users")
+     cur_someone_data = Map.get(all_users_map,follower)
+     cur_someone_follower_list = Map.get(cur_someone_data,"followers")
+     cur_someone_follower_list = cur_someone_follower_list ++ [follower]
+     cur_someone_data = Map.put(cur_someone_data,"followers",cur_someone_follower_list)
+     all_users_map = Map.put(all_users_map,follower,cur_someone_data)
+     state = Map.put(state,"users",all_users_map)
+     {:reply,state,state}
+  end
+
 
     def handle_call({:register_user ,new_message},_from,state) do 
          username = elem(new_message,0)
@@ -34,9 +63,17 @@ defmodule Server do
         {:reply,state,state}
     end
 
+    def handle_call({:is_online ,new_message},_from,state) do 
+        user = elem(new_message, 0)
+        IO.puts to_string(user) <> " is back online" 
+        {:reply,state,state}
+    end
+
     def handle_call({:go_offline ,new_message},_from,state) do  
         IO.puts "still going offline"
+        
         username = elem(new_message,0)
+        IO.puts username
         user_state = elem(new_message,1)
         all_users_state = Map.get(state,"users")
         all_users_state = Map.put(all_users_state,username,user_state)
