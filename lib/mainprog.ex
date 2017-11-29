@@ -94,8 +94,8 @@ defmodule Mainprog do
         num = 1..1000
         num_list = Enum.to_list(num)
 
-        random_tweets_with_hashtag(hashtaglist,100,num_list)
-        random_tweets_with_mention(100,num_list)
+        Test.random_tweets_with_hashtag(hashtaglist,100,num_list)
+        Test.random_tweets_with_mention(100,num_list)
 
 
         for x <- 1..3 do
@@ -104,7 +104,7 @@ defmodule Mainprog do
 
         for x <- 1..1000 do
             weight = round(Enum.at(weighted_followers,x-1))
-            spawn fn -> Test.random_follow_tweet("user"<>Integer.to_string(x),weight,num_list) end     
+            Test.random_follow_tweet("user"<>Integer.to_string(x),weight,num_list)
         end
 
 
@@ -181,6 +181,21 @@ defmodule Mainprog do
         #GenServer.call(String.to_atom(someone), {:tweet, {tweet}})
     end
 
+
+    def search_hashtag(hashtag) do
+        server_state = GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:get_state, "mainserver"}) 
+        all_hashtags_map = Map.get(server_state,"hashtags")
+        hashtag_tweets = Map.get(all_hashtags_map,hashtag)
+        IO.inspect hashtag_tweets
+    end
+
+
+    def search_mention(mention) do
+        server_state = GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:get_state, "mainserver"})  
+        all_mentions_map = Map.get(server_state,"mentions")
+        mention_tweets = Map.get(all_mentions_map,mention)
+        IO.inspect mention_tweets
+    end
 
     def tweet(tweeter,tweet) do
         #IO.puts "send tweet"
