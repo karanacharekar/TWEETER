@@ -45,13 +45,7 @@ defmodule Mainprog do
     end
 
 
-    def serach_hashtag(hashtag) do
-        IO.inspect GenServer.call(String.to_atom("mainserver"), {:search_hashtag, {}}) 
-    end
-
-    def search_mention(mention)  do
-        IO.inspect GenServer.call(String.to_atom("mainserver"), {:search_mentions, {}}) 
-    end
+    
 
     def login(user_name,pass_word) do
         server_state = GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:get_state, "mainserver"})
@@ -136,7 +130,8 @@ defmodule Mainprog do
         end
 
         GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:print_state, "mainserver"}) 
-
+        search_hashtag("#realmadrid")
+        search_mention("@user100")
     end
 
 
