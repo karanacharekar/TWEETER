@@ -1,7 +1,7 @@
 defmodule Mainprog do
    use GenServer
     
-    def main() do
+    def main(numClients) do
         IO.puts "client rchd"
         client_name = "client@" <> get_ip_addr()
         server_name = "server@" <> get_ip_addr()
@@ -9,7 +9,7 @@ defmodule Mainprog do
         Node.set_cookie :"choco"
         Node.connect(String.to_atom(server_name)) 
         IO.inspect Node.list
-        testfunc();
+        testfunc(numClients);
         #IO.puts "####################################"
     end
 
@@ -27,13 +27,7 @@ defmodule Mainprog do
     end
 
     def register_user(username,password) do
-        #client_name = username <> "@" <> get_ip_addr()
-        #IO.puts client_name
-        #server_name = "server@" <> get_ip_addr()
-        #Node.start(String.to_atom(client_name))
-        #Node.set_cookie :"choco"
-        #IO.inspect Node.connect(String.to_atom(server_name))
-        #IO.inspect Node.list
+
         server_state = GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:get_state, "mainserver"})
         allusers_map = Map.get(server_state,"users")
         if(Map.get(allusers_map,username) == nil) do
@@ -47,105 +41,74 @@ defmodule Mainprog do
 
     
 
-    def login(user_name,pass_word) do
+    def login(user_name,pass_word,weight,numClients) do
+        IO.puts "login func"
         server_state = GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:get_state, "mainserver"})
+        IO.inspect server_state
+        IO.puts "karan"
         allusers_map = Map.get(server_state,"users")
         curr_usr_map = Map.get(allusers_map,user_name)
+        
         if(curr_usr_map == nil) do
             IO.puts "User not registered"
         else
             if(Map.get(curr_usr_map,"password") == pass_word) do
-                GenServer.start_link(__MODULE__, {user_name,pass_word,{}}, name: String.to_atom(user_name))
-                GenServer.call(String.to_atom(user_name), {:create_dashboard_list, {}}) ### CHECK THISSS
+                IO.puts "pasword matched"
+                GenServer.start_link(__MODULE__, {user_name,pass_word,weight,{}}, name: String.to_atom(user_name))
+                create_dashboard_list(user_name)
+                IO.puts "back"
+                spawn fn -> Simulator.main(user_name,weight,numClients) end
+                ### CHECK THISSS
                 IO.puts "Login succesful"
             else
                 IO.puts "Incorrect password"
             end
         end
+
     end
 
 
-    def testfunc() do
+    def testfunc(numClients) do
+        weighted_followers = getZipfDist(numClients) |> IO.inspect
 
-        weighted_followers = Test.getZipfDist(1000) |> IO.inspect
-        hashtaglist = ["#karan","#srishti","#aru","#football","#apple","#mango","#realmadrid","#india","#tweeter","#beer","#rum","#vodka"]
-
-        for x <- 1..1000 do
+        for x <- 1..numClients do
            register_user("user"<> Integer.to_string(x), "pass"<> Integer.to_string(x)) 
-           
         end
         
-        
 
-        for x <- 1..1000 do
-           login("user"<> Integer.to_string(x), "pass" <> Integer.to_string(x)) 
-        end
-        
-        
-        
-
-        all_users_list = Test.create_users_list(1000,[])
-        num = 1..1000
-        num_list = Enum.to_list(num)
-
-        Test.random_tweets_with_hashtag(hashtaglist,100,num_list)
-        Test.random_tweets_with_mention(100,num_list)
-
-
-        for x <- 1..3 do
-            spawn fn -> Test.simulate_connect_disconnect(num_list) end
-        end
-
-        for x <- 1..1000 do
+        for x <- 1..numClients do
             weight = round(Enum.at(weighted_followers,x-1))
-            Test.random_follow_tweet("user"<>Integer.to_string(x),weight,num_list) 
+            login("user"<> Integer.to_string(x), "pass" <> Integer.to_string(x),weight,numClients) 
+        end
+        
+
+        :timer.sleep(10000)
+        for x <- 1..numClients do
+            spawn fn -> IO.inspect GenServer.call(String.to_atom("user"<>to_string(x)), {:print_state,"printing"}) end
+            :timer.sleep(1000)
         end
 
-
-
-        for x <-1..1000 do
-            if(Process.whereis(String.to_atom("user"<>to_string(x))) != nil) do
-                retweeter_state = GenServer.call(String.to_atom("user"<>to_string(x)), {:get_state, {}})
-            
-
-            dashboard_list = Map.get(retweeter_state,"dashboard")
-            size = Enum.count(dashboard_list)
-            num_retweets = round(:math.ceil(0.30*size))
-
-            for y <- 1..num_retweets do
-                if(Enum.count(dashboard_list)!=0) do
-                    retweet = Enum.random(dashboard_list)
-                    id = elem(retweet,0)
-                    tweeter = elem(retweet,2)
-                    dashboard_list = List.delete(dashboard_list, retweet)
-                    if("user"<>to_string(x) != tweeter) do
-                        if(Process.whereis(String.to_atom("user"<>to_string(x))) != nil) do
-                            retweet("user"<>to_string(x),tweeter,id) 
-                        end
-                    end
-                end
-            end
-            end
-
-        end
-
-        GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:print_state, "mainserver"}) 
-        search_hashtag("#realmadrid")
-        search_mention("@user100")
+        
     end
 
 
     def init(args) do
+        IO.puts "login def"
         username = elem(args,0)
         passwd = elem(args,1)
+        weight = elem(args, 2)
         state = GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:get_state, "mainserver"})       
         all_users_map = Map.get(state,"users")  
-        #IO.inspect all_users_map
-        #IO.inspect username
         serv_resp = Map.get(all_users_map, username)
         state = serv_resp
         {:ok,state}
     end 
+
+
+    def create_dashboard_list(user_name) do
+        IO.puts "inside dash"
+        GenServer.call(String.to_atom(user_name), {:create_dashboard_list, {}})
+    end
 
 
     def go_online(user_name,pass_word) do
@@ -226,6 +189,15 @@ defmodule Mainprog do
 
     end
 
+    def getZipfDist(numberofClients) do
+            distList=[]
+            s=1
+            c= Test.getConstantValue(numberofClients,s)
+            distList=Enum.map(1..numberofClients,fn(x)->:math.ceil((c*numberofClients)/:math.pow(x,s)) end)
+            distList
+        end
+
+
     def parse_tweet(tweeter,tweet,id,timestamp) do
 
         state = GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:get_state, "mainserver"})  
@@ -296,10 +268,13 @@ defmodule Mainprog do
   def handle_call({:add_tweets_following_alive ,new_message},_from,state) do 
     #IO.inspect state 
     someone = elem(new_message, 0)
+
     someone_state = GenServer.call(String.to_atom(someone),{:get_state, "someone"})
     someone_tweet_list = Map.get(someone_state,"tweets")
     dashboard_list = Map.get(state,"dashboard")
+    
     dashboard_list = dashboard_list ++ someone_tweet_list 
+   
     dashboard_list = Enum.sort(dashboard_list,&(elem(&1,2) > elem(&2,2)))
     state = Map.put(state, "dashboard", dashboard_list)
     {:reply,state,state}
@@ -315,17 +290,21 @@ defmodule Mainprog do
     someone_tweet_list = Map.get(someone_state,"tweets")
     dashboard_list = Map.get(state,"dashboard")
     dashboard_list = dashboard_list ++ someone_tweet_list 
+    if(dashboard_list != nil ) do
     dashboard_list = Enum.sort(dashboard_list,&(elem(&1,2) > elem(&2,2)))
+    end
     state = Map.put(state, "dashboard", dashboard_list)
     {:reply,state,state}
   end
 
+
   def handle_call({:create_dashboard_list,new_message},_from,state) do  
+    
     tweeter_following_list = Map.get(state,"following")
     tweeter_dashboard_list = Map.get(state,"dashboard")
     tweeter_follower_list = Map.get(state,"followers")
     if(Enum.empty?(tweeter_following_list) && Enum.empty?(tweeter_follower_list) && Enum.empty?(tweeter_dashboard_list)) do
-        #IO.puts " First time login "
+        IO.puts " First time login "
     else
         server_state = GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>get_ip_addr())},{:get_state, "mainserver"}) 
         menion_map = Map.get(server_state,"mentions")
@@ -334,11 +313,14 @@ defmodule Mainprog do
                 following_state = GenServer.call(String.to_atom(n),{:get_state, "get following peoples tweets"})  
                 tweeter_dashboard_list = tweeter_dashboard_list ++ Map.get(following_state,"tweets")
         end)
+        
         tweeter_dashboard_list = tweeter_dashboard_list ++  Map.get(menion_map,"@"<>Map.get(state,"username"))
+        IO.inspect tweeter_dashboard_list
 
-        if(tweeter_dashboard_list != nil) do
-            tweeter_dashboard_list = Enum.sort(tweeter_dashboard_list,&(elem(&1,2) > elem(&2,2)))
-        end
+        # if(tweeter_dashboard_list != nil) do
+        #     IO.puts "reached inside"
+        #     tweeter_dashboard_list = Enum.sort(tweeter_dashboard_list,&(elem(&1,2) > elem(&2,2)))
+        # end
     end
     {:reply,state,state}
   end
@@ -405,7 +387,7 @@ defmodule Mainprog do
     state = Map.put(state, "dashboard", dashboard_list)
     Enum.each(follower_list, fn(n) ->
         pid = Process.whereis(String.to_atom(n))
-        if(pid != nil) do
+        if(pid != nil && n != tweeter) do
             GenServer.call(String.to_atom(n), {:tweet_someone_alive, {last_tweet_id+1,timestamp,tweeter,tweet}})
         end
     end)
@@ -428,114 +410,9 @@ end
 
 
 
-defmodule Test do
+
+
+        
         
 
 
-        def getZipfDist(numberofClients) do
-            distList=[]
-            s=1
-            c=getConstantValue(numberofClients,s)
-            distList=Enum.map(1..numberofClients,fn(x)->:math.ceil((c*numberofClients)/:math.pow(x,s)) end)
-            distList
-        end
-
-        def getConstantValue(numberofClients,s) do
-            k=Enum.reduce(1..numberofClients,0,fn(x,acc)->:math.pow(1/x,s)+acc end )
-            k=1/k
-            k
-        end
-
-        def simulate_connect_disconnect(num_list) do
-            #:timer.sleep(1000)
-            
-          
-            dead = Enum.random(num_list)
-            Mainprog.go_offline("user"<>to_string(dead))
-            #:timer.sleep(100)
-            if(Process.whereis(String.to_atom("user"<>to_string(dead))) == nil) do
-                IO.puts "--------------------------------------------------------------------------------------------------------------------------------------"
-                IO.puts "user" <> to_string(dead) <> " went offline"
-            end
-            :timer.sleep(2000)
-            Mainprog.go_online("user"<>to_string(dead),"pass"<>to_string(dead))
-            if(Process.whereis(String.to_atom("user"<>to_string(dead))) != nil) do
-                GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>Mainprog.get_ip_addr())},{:is_online, {"user"<>to_string(dead)}}) 
-                IO.puts "--------------------------------------------------------------------------------------------------------------------------------------"
-                IO.puts "user" <> to_string(dead) <> " came online"
-            end
-        end
-       
-        
-        def create_users_list(num,list) do
-            if num > 0 do
-                user = "user" <> Integer.to_string(num)
-                list = list ++ [user]
-                create_users_list(num-1,list) 
-            else
-                list
-            end
-        end
-
-        def random_tweets_with_hashtag(hashtaglist,num,num_list) do
-            if num >0 do
-                cur = Enum.random(num_list)
-                cur_user = "user" <> to_string(cur)
-                if(Process.whereis(String.to_atom(cur_user)) != nil) do
-                        Mainprog.tweet(cur_user,"I am tweet with hashtag " <> Enum.random(hashtaglist))
-                end
-                random_tweets_with_hashtag(hashtaglist,num-1,num_list)
-            end
-        end
-
-
-        def random_tweets_with_mention(num,num_list) do
-            if num > 0 do
-                cur = Enum.random(num_list)
-                cur_user = "user" <> to_string(cur)
-                mention = Enum.random(num_list)
-                mention_user = "@user"<> to_string(mention)
-                if(cur != mention) do
-                    if(Process.whereis(String.to_atom(cur_user)) != nil) do
-                            Mainprog.tweet(cur_user,"I am tweet with mention " <> "@user" <> to_string(Enum.random(num_list)))
-                    end    
-                    random_tweets_with_mention(num-1,num_list)
-                else
-                    random_tweets_with_mention(num,num_list)
-                end
-            end
-        end
-
-        def random_follow_tweet(cur_user,num,num_list) do
-            #IO.puts "curr user is " <> to_string(cur_user)
-            if num > 0 do
-                to_follow = Enum.random(num_list)
-                #IO.inspect to_follow
-                if cur_user != "user"<>Integer.to_string(to_follow)  do
-                    if(Process.whereis(String.to_atom("user"<> Integer.to_string(to_follow))) != nil) do
-                            num_list = List.delete(num_list,to_follow)
-                            #IO.inspect num_list
-                            Mainprog.follow_someone("user"<> Integer.to_string(to_follow),cur_user)
-                    end
-                    if(Process.whereis(String.to_atom(cur_user)) != nil) do
-                                IO.puts "alive"
-                                Mainprog.tweet(cur_user,"I am Tweet")
-
-                    end
-                            #IO.puts "hereee"
-                            random_follow_tweet(cur_user,num-1,num_list)
-                    
-                else
-                    num_list = List.delete(num_list,to_follow)
-                    random_follow_tweet(cur_user,num,num_list)
-                end
-            
-            end
-            if(Process.whereis(String.to_atom(cur_user)) != nil) do
-                GenServer.call(String.to_atom(cur_user),{:print_state, "someone"}) 
-            end
-        end
-
-
-
-end

@@ -1,6 +1,6 @@
 defmodule Tweeter do
     
-     def main(args) do
+    def main(args) do
         args |> parse_args 
 
         # startservid = spawn fn -> Server.main() end
@@ -17,33 +17,19 @@ defmodule Tweeter do
 
   # THIS FUNCTION PARSES ARGUMENTS AND DECIDES BETWEEN SERVER AND CLIENT 
 
-   def parse_args(args) do
-      {_, [input], _} = OptionParser.parse(args)
-      
-      if(input=="server") do
+    def parse_args(args) do
+      {_, input, _} = OptionParser.parse(args)
+      type = Enum.at(input,0)
+      if(type=="server") do
           Server.main()
       end
 
-      if(input=="client") do
-          Mainprog.main()  
+      if(type=="client") do
+          numClients = String.to_integer(Enum.at(input,1))
+          Mainprog.main(numClients)  
       end
 
       IO.puts " Wrong input " 
-   end
-    
-
-   def get_ip_addr do 
-    {:ok,lst} = :inet.getif()
-    z = elem(List.last(lst),0) 
-    if elem(z,0)==127 do
-    x = elem(List.first(lst),0)
-    addr =  to_string(elem(x,0)) <> "." <>  to_string(elem(x,1)) <> "." <>  to_string(elem(x,2)) <> "." <>  to_string(elem(x,3))
-    else
-    x = elem(List.last(lst),0)
-    addr =  to_string(elem(x,0)) <> "." <>  to_string(elem(x,1)) <> "." <>  to_string(elem(x,2)) <> "." <>  to_string(elem(x,3))
     end
-    addr  
-  end
-
-
+    
 end   
