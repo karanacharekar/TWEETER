@@ -3,7 +3,7 @@ defmodule Simulator do
     
     def main(username,weight,numClients) do
         
-        IO.puts "simulating"
+        #IO.puts "simulating"
         hashtaglist = ["#karan","#srishti","#aru","#football","#apple","#mango","#realmadrid","#india","#tweeter","#beer","#rum","#vodka"]
 
         all_users_list = Test.create_users_list(numClients,[])
@@ -13,10 +13,11 @@ defmodule Simulator do
         #Test.random_tweets_with_hashtag(hashtaglist,100,num_list)
         #Test.random_tweets_with_mention(100,num_list)
 
-        IO.puts " done hashtag mention"
-        # for x <- 1..3 do
-        #     spawn fn -> Test.simulate_connect_disconnect(num_list) end
-        # end
+        #IO.puts " done hashtag mention"
+        
+        for x <- 1..3 do
+             spawn fn -> Test.simulate_connect_disconnect(num_list) end
+        end
 
         
         # Test.random_follow_tweet(username,weight,num_list) 
@@ -26,7 +27,7 @@ defmodule Simulator do
         Test.random_follow(username,weight, num_list)
 
         # IO.puts "follow retweet"
-        # Test.sim_retweet(username)
+        #Test.sim_retweet(username)
 
 
 
@@ -74,20 +75,22 @@ defmodule Test do
         end
 
         def simulate_connect_disconnect(num_list) do
-            #:timer.sleep(1000)
+            
             
           
             dead = Enum.random(num_list)
-            spawn fn -> Mainprog.go_offline("user"<>to_string(dead)) end
-            #:timer.sleep(100)
+            spawn fn -> Mainprog.go_offline("user"<>to_string(dead))  end
+            :timer.sleep(500)
+            
             if(Process.whereis(String.to_atom("user"<>to_string(dead))) == nil) do
                 IO.puts "--------------------------------------------------------------------------------------------------------------------------------------"
                 IO.puts "user" <> to_string(dead) <> " went offline"
             end
-            :timer.sleep(2000)
-            Mainprog.go_online("user"<>to_string(dead),"pass"<>to_string(dead))
+            :timer.sleep(900)
+
+            Mainprog.go_online("user"<>to_string(dead),"pass"<>to_string(dead)) 
             if(Process.whereis(String.to_atom("user"<>to_string(dead))) != nil) do
-                GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>Mainprog.get_ip_addr())},{:is_online, {"user"<>to_string(dead)}}) 
+                #GenServer.call({String.to_atom("mainserver"),String.to_atom("server@"<>Mainprog.get_ip_addr())},{:is_online, {"user"<>to_string(dead)}}) 
                 IO.puts "--------------------------------------------------------------------------------------------------------------------------------------"
                 IO.puts "user" <> to_string(dead) <> " came online"
             end
@@ -109,6 +112,7 @@ defmodule Test do
                 cur = Enum.random(num_list)
                 cur_user = "user" <> to_string(cur)
                 if(Process.whereis(String.to_atom(cur_user)) != nil) do
+                        IO.puts "tweeting with hashtag"
                         spawn fn -> Mainprog.tweet(cur_user,"I am tweet with hashtag " <> Enum.random(hashtaglist)) end
                 end
                 random_tweets_with_hashtag(hashtaglist,num-1,num_list)
@@ -117,8 +121,9 @@ defmodule Test do
 
 
         def sim_retweet(username) do
+            IO.puts username <> " retweeting"
             if(Process.whereis(String.to_atom(username)) != nil) do
-                retweeter_state = GenServer.call(String.to_atom(username), {:get_state, {}})
+                retweeter_state = GenServer.call(String.to_atom(username), {:get_state, {}},:infinity)
 
             dashboard_list = Map.get(retweeter_state,"dashboard")
             size = Enum.count(dashboard_list)
@@ -132,6 +137,7 @@ defmodule Test do
                     dashboard_list = List.delete(dashboard_list, retweet)
                     if(username != tweeter) do
                         if(Process.whereis(String.to_atom(username)) != nil) do
+                            #IO.puts "retweeeeeeeting"
                             spawn fn -> Mainprog.retweet(username,tweeter,id) end
                         end
                     end
@@ -148,6 +154,7 @@ defmodule Test do
                 mention_user = "@user"<> to_string(mention)
                 if(cur != mention) do
                     if(Process.whereis(String.to_atom(cur_user)) != nil) do
+                            IO.puts "tweeting with mention"
                             spawn fn -> Mainprog.tweet(cur_user,"I am tweet with mention " <> "@user" <> to_string(Enum.random(num_list))) end
                     end    
                     random_tweets_with_mention(num-1,num_list)
@@ -158,14 +165,15 @@ defmodule Test do
         end
 
         def random_tweet(cur_user, num, num_list) do
+            #IO.puts cur_user <> " tweeting"
             if num > 0 do
                 
                 to_follow = Enum.random(num_list)
-                IO.inspect to_follow
+                #IO.inspect to_follow
                 if cur_user != "user"<>Integer.to_string(to_follow)  do
 
                     if(Process.whereis(String.to_atom(cur_user)) != nil) do
-                                IO.puts "alive"
+                                #IO.puts "alive"
                                 spawn fn -> Mainprog.tweet(cur_user,"I am Tweet") end
 
                     end
@@ -174,13 +182,14 @@ defmodule Test do
                     
                 else
                     num_list = List.delete(num_list,to_follow)
-                    random_tweet(cur_user,num,num_list)
+                    spawn fn -> random_tweet(cur_user,num,num_list) end
                 end
             
             end
-            if(Process.whereis(String.to_atom(cur_user)) != nil) do
-                 GenServer.call(String.to_atom(cur_user),{:print_state, "someone"}) 
-            end
+
+            # if(Process.whereis(String.to_atom(cur_user)) != nil) do
+            #      GenServer.call(String.to_atom(cur_user),{:print_state, "someone"}) 
+            # end
         end
 
 
@@ -193,7 +202,7 @@ defmodule Test do
                     if(Process.whereis(String.to_atom("user"<> Integer.to_string(to_follow))) != nil) do
                             num_list = List.delete(num_list,to_follow)
                             #IO.inspect num_list
-                            IO.puts "---------"
+                            #IO.puts "---------"
                             spawn fn -> Mainprog.follow_someone("user"<> Integer.to_string(to_follow),cur_user) end
                             random_follow(cur_user,num-1,num_list)
                     else 
@@ -210,15 +219,15 @@ defmodule Test do
         def random_follow_tweet(cur_user,num,num_list) do
             #IO.puts "curr user is " <> to_string(cur_user)
             if num > 0 do
-                IO.puts num
+                #IO.puts num
 
                 to_follow = Enum.random(num_list)
-                IO.inspect to_follow
+                #IO.inspect to_follow
                 if cur_user != "user"<>Integer.to_string(to_follow)  do
                     if(Process.whereis(String.to_atom("user"<> Integer.to_string(to_follow))) != nil) do
                             num_list = List.delete(num_list,to_follow)
                             #IO.inspect num_list
-                            IO.puts "---------"
+                            #IO.puts "---------"
                             spawn fn -> Mainprog.follow_someone("user"<> Integer.to_string(to_follow),cur_user) end
                     
                     else 
@@ -227,7 +236,7 @@ defmodule Test do
                     end
 
                     if(Process.whereis(String.to_atom(cur_user)) != nil) do
-                                IO.puts "alive"
+                                #IO.puts "alive"
                                 spawn fn -> Mainprog.tweet(cur_user,"I am Tweet") end
 
                     end

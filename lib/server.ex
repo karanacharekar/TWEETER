@@ -1,3 +1,4 @@
+
 defmodule Server do
     use GenServer
     
@@ -48,6 +49,8 @@ defmodule Server do
   end
 
 
+
+
     def handle_call({:register_user ,new_message},_from,state) do 
          username = elem(new_message,0)
          password = elem(new_message,1)
@@ -65,15 +68,20 @@ defmodule Server do
 
     def handle_call({:is_online ,new_message},_from,state) do 
         user = elem(new_message, 0)
-        IO.puts to_string(user) <> " is back online" 
+        #IO.puts to_string(user) <> " is back online" 
+        {:reply,state,state}
+    end
+
+    def handle_call({:is_offline ,new_message},_from,state) do 
+        user = elem(new_message, 0)
+        IO.puts to_string(user) <> " went offline" 
         {:reply,state,state}
     end
 
     def handle_call({:go_offline ,new_message},_from,state) do  
-        IO.puts "still going offline"
-        
+        #IO.puts "still going offline"
         username = elem(new_message,0)
-        IO.puts username
+        #IO.puts username
         user_state = elem(new_message,1)
         all_users_state = Map.get(state,"users")
         all_users_state = Map.put(all_users_state,username,user_state)
@@ -122,7 +130,7 @@ defmodule Server do
   end
 
   def handle_call({:add_new_mention, msg},_from,state) do
-       IO.puts "new mention"
+       #IO.puts "new mention"
        mention = elem(msg,0)
        allusers_map = Map.get(state,"users")
        #IO.inspect allusers_map
@@ -130,7 +138,7 @@ defmodule Server do
        #IO.inspect mentionwithoutatrate
        #IO.inspect Map.get(allusers_map,mentionwithoutatrate)
        if(Map.get(allusers_map,mentionwithoutatrate) != nil) do
-            IO.puts "user present"
+            #IO.puts "user present"
             tweet =  elem(msg,1)
             tweeter = elem(msg,2)
             id = elem(msg,3)

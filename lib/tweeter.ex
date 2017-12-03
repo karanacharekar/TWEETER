@@ -25,10 +25,15 @@ defmodule Tweeter do
       end
 
       if(type=="client") do
+          prev = System.os_time(:millisecond)
           numClients = String.to_integer(Enum.at(input,1))
-          Mainprog.main(numClients)  
+          Mainprog.main(numClients)
+          next = System.os_time(:millisecond)
+          diff = next - prev
+          IO.puts "total time taken in secs"
+          IO.inspect (diff/1000)
       end
-
+      
       IO.puts " Wrong input " 
     end
     
